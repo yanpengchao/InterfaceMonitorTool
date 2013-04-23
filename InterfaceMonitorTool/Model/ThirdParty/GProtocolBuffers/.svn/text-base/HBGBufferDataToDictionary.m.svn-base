@@ -1,0 +1,125 @@
+//
+//  HBGBufferDataToDictionary.m
+//  HowbuyFund
+//
+//  Created by yan pengchao on 12-4-5.
+//  Copyright (c) 2012年 Howbuy. All rights reserved.
+//
+
+#import "HBGBufferDataToDictionary.h"
+#import <objc/runtime.h>
+
+@implementation HBGBufferDataToDictionary
+
++(NSDictionary*)toDictionary:(NSMutableDictionary*)dic withData:(id)parsedData
+{
+    if (parsedData == nil || dic == nil) {
+        return nil;
+    }
+/*    
+    id LenderClass = objc_getClass("TestPropertyListClass");
+    unsigned int outCount;
+    objc_property_t *properties = class_copyPropertyList(LenderClass, &outCount);
+    
+    for (int i = 0; i < outCount; i++) {
+        objc_property_t property = properties[i];
+        fprintf(stdout, "%s %s\n", property_getName(property), property_getAttributes(property));
+    }
+    
+    Method* methods = class_copyMethodList(LenderClass, &outCount);
+    for (int i = 0 ; i < outCount ; i ++) {
+        Method method = methods[i];
+        fprintf(stdout, "%s\n", method_getName(method));
+    }
+ 
+ 表 6-1  Objective-C类型编码
+ 编码         含义
+ c              char
+ i              int
+ s              short
+ l              long 在64位程序中，l为32位。
+ q              long long
+ C              unsigned char
+ I              unsigned int
+ S              unsigned short
+ L              unsigned long
+ Q              unsigned long long
+ f              float
+ d              double
+ B              C++标准的bool或者C99标准的_Bool
+ v              void
+ *              字符串（char *）
+ @              对象（无论是静态指定的还是通过id引用的）
+ #              类（Class）
+ :              方法选标（SEL）
+ [array type]   数组
+ {name=type...} 结构体
+ (name=type...) 联合体
+ bnum           num个bit的位域
+ ^type          type类型的指针
+ ?              未知类型（其它时候，一般用来指函数指针）
+
+*/    
+    Class dataClass = [parsedData class];
+    
+    unsigned int propertiesCount = 0;
+    objc_property_t *properties = class_copyPropertyList(dataClass, &propertiesCount);
+    
+    unsigned int methodsCount = 0;
+    Method* methods = class_copyMethodList(dataClass, &methodsCount);
+    NSMutableArray* methodsArray = [[NSMutableArray alloc]initWithCapacity:methodsCount];
+    
+    for (int i = 0 ; i < methodsCount; i ++) {
+        NSString* methodName = [[NSString alloc]initWithUTF8String:method_getName(methods[i])];
+        [methodsArray addObject:methodName];
+    }
+    
+    // 遍历所有属性
+    for (int i = 0 ; i < propertiesCount; i ++) {
+        NSString* propertyName = [[NSString alloc]initWithUTF8String:property_getName(properties[i])];
+        NSString* propertyAttribute = [[NSString alloc]initWithUTF8String:property_getAttributes(properties[i])];
+        NSString* upperPropertyName = [[NSString alloc]initWithFormat:@"%@%@", [[propertyName substringToIndex:1] uppercaseString], [propertyName substringFromIndex:1]];  
+        NSString* myMethodName = [[NSString alloc]initWithFormat:@"has%@", upperPropertyName];
+        
+        int indexOfMethodName = [methodsArray containsObject:myMethodName];
+        if ((indexOfMethodName != -1 && [parsedData performSelector:method_getName(methods[indexOfMethodName])]) || indexOfMethodName == -1) {   // 处理has这种形式的变量
+            if ([propertyAttribute rangeOfString:@"Tq"].location != NSNotFound) {
+                // long long
+                NSNumber* number = [NSNumber numberWithLongLong:[parsedData valueForKey:propertyName]];
+                [dic setObject:number forKey:propertyName];
+            }
+            else if ([propertyAttribute rangeOfString:@"T@\"NSString\""].location != NSNotFound)
+            {
+                [dic setObject:[parsedData valueForKey:propertyName] forKey:propertyName];
+            }
+            else if ([propertyAttribute rangeOfString:@"T@\"NSMutableArray\""].location != NSNotFound){
+/*                NSMutableArray* fndAnnoArray = [[NSMutableArray alloc]init];
+                for (FundAnno* fndAnnoItem in mutableFndAnnoList) 
+                {
+                    NSMutableDictionary* subDic = [[NSMutableDictionary alloc]init];
+                    [fndAnnoItem dictionary:subDic];
+                    [fndAnnoArray addObject:subDic];
+                }
+                [dic setObject:fndAnnoArray forKey:@"fndAnnoList"];*/
+                NSMutableArray* array = [parsedData valueForKey:propertyName];
+                NSMutableArray* tempArray = [[NSMutableArray alloc]initWithCapacity:[array count]];
+                for (id item in array) {
+                    NSMutableDictionary* subDic = [[NSMutableDictionary alloc]init];
+                    [HBGBufferDataToDictionary toDictionary:subDic withData:item];
+                    [tempArray addObject:subDic];
+                }
+                
+                [dic setObject:tempArray forKey:propertyName];
+                [tempArray release];
+            }
+            else if ([propertyAttribute rangeOfString:@"T@"].location != NSNotFound){
+                // 其他类
+                [HBGBufferDataToDictionary toDictionary:dic withData:[parsedData valueForKey:propertyName]];
+            }
+        }
+    }
+    
+    return dic;
+}
+
+@end

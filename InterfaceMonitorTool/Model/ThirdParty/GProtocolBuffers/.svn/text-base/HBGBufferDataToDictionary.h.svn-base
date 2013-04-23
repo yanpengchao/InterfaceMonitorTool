@@ -1,0 +1,15 @@
+//
+//  HBGBufferDataToDictionary.h
+//  HowbuyFund
+//
+//  Created by yan pengchao on 12-4-5.
+//  Copyright (c) 2012年 Howbuy. All rights reserved.
+//
+
+#import <UIKit/UIKit.h>
+
+@interface HBGBufferDataToDictionary : NSObject
+
++(NSDictionary*)toDictionary:(NSMutableDictionary*)dic withData:(id)parsedData;
+
+@end

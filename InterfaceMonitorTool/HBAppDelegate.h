@@ -9,11 +9,12 @@
 #import <UIKit/UIKit.h>
 
 @class HBViewController;
+@class HBNavigationViewController;
 
 @interface HBAppDelegate : UIResponder <UIApplicationDelegate>
 
 @property (strong, nonatomic) UIWindow *window;
-
+@property (nonatomic, strong) HBNavigationViewController* navigationViewController;
 @property (strong, nonatomic) HBViewController *viewController;
 
 @end

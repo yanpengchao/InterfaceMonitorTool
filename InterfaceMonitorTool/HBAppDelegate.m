@@ -7,21 +7,26 @@
 //
 
 #import "HBAppDelegate.h"
-
 #import "HBViewController.h"
+#import "HBNavigationViewController.h"
 
 @implementation HBAppDelegate
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
     self.window = [[UIWindow alloc] initWithFrame:[[UIScreen mainScreen] bounds]];
+    [UIApplication sharedApplication].idleTimerDisabled = YES;
+    
     // Override point for customization after application launch.
     if ([[UIDevice currentDevice] userInterfaceIdiom] == UIUserInterfaceIdiomPhone) {
         self.viewController = [[HBViewController alloc] initWithNibName:@"HBViewController_iPhone" bundle:nil];
     } else {
         self.viewController = [[HBViewController alloc] initWithNibName:@"HBViewController_iPad" bundle:nil];
     }
-    self.window.rootViewController = self.viewController;
+    
+    self.navigationViewController = [[HBNavigationViewController alloc] initWithRootViewController:self.viewController];
+    self.window.rootViewController = self.navigationViewController;
+    
     [self.window makeKeyAndVisible];
     return YES;
 }
