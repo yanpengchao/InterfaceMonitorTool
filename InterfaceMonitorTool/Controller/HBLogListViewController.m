@@ -96,9 +96,9 @@
 {
     if (editingStyle == UITableViewCellEditingStyleDelete) {
         // Delete the row from the data source
-        [HBFileLog deleteLogFile:[self.logFileArray objectAtIndex:indexPath.row]];
+        [HBFileLog deleteLogFile:[self.logFileArray objectAtIndex:([self.logFileArray count] - indexPath.row - 1)]];
         NSMutableArray* tempLogFileArray = [NSMutableArray arrayWithArray:self.logFileArray];
-        [tempLogFileArray removeObjectAtIndex:indexPath.row];
+        [tempLogFileArray removeObjectAtIndex:([self.logFileArray count] - indexPath.row - 1)];
         self.logFileArray = tempLogFileArray;
         [tableView deleteRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationFade];
     }

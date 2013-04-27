@@ -17,6 +17,8 @@
 #import "HBMultiLineCell.h"
 #import "HBUITools.h"
 
+//#define TEST_TIMER
+
 @interface HBInterfaceItem : HBMultiSelectItem
 {
     //
@@ -112,12 +114,17 @@
     if ([HBAppConfig getInstance].timerConfigChanged) {
         [HBAppConfig getInstance].timerConfigChanged = NO;
         
-        [self setupTimer];
-        
         [self.mainTimer invalidate];
+#ifdef TEST_TIMER
+        self.mainTimer = [NSTimer timerWithTimeInterval:2*60 target:self selector:@selector(setupTimer) userInfo:nil repeats:YES];
+        [self writeMyLog:@"主定时器将每隔8分钟启动一次"];
+#else
         self.mainTimer = [NSTimer timerWithTimeInterval:24*60*60 target:self selector:@selector(setupTimer) userInfo:nil repeats:YES];
-        [self writeMyLog:@"主定时器将在24小时后启动"];
+        [self writeMyLog:@"主定时器将每隔24小时启动一次"];
+#endif
         [[NSRunLoop currentRunLoop] addTimer:self.mainTimer forMode:NSRunLoopCommonModes];
+        
+        [self setupTimer];
     }
     
     self.title = @"检测工具";
@@ -298,7 +305,8 @@
         
         if (finished) {
             [self writeMyLog:@"接口检测结束"];
-            [[HBFileLog getInstance] endLog];
+            
+            [self performSelector:@selector(endLog) withObject:nil afterDelay:.1];
             
             NSDateFormatter* dateFormatter = [[NSDateFormatter alloc] init];
             [dateFormatter setDateStyle:NSDateFormatterFullStyle];
@@ -415,6 +423,16 @@
     [[HBFileLog getInstance] writeLog:logString];
 }
 
+- (void)endLog
+{
+    [self performSelectorOnMainThread:@selector(_endLog_) withObject:nil waitUntilDone:NO];
+}
+
+- (void)_endLog_
+{
+    [[HBFileLog getInstance] endLog];
+}
+
 #pragma mark - Table view data source
 
 - (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView
@@ -466,10 +484,10 @@
 }
 
 - (void)setupTimer
-{
-    for (NSTimer* timer in self.timerArray) {
-        [timer invalidate];
-    }
+{   
+    NSCalendar *gregorian = [[NSCalendar alloc] initWithCalendarIdentifier:NSGregorianCalendar];
+    NSDateComponents *weekdayComponents =[gregorian components:NSWeekdayCalendarUnit fromDate:[NSDate date]];
+    NSInteger weekday = [weekdayComponents weekday];
     
     NSMutableArray* tempArray = [NSMutableArray array];
     for (NSDictionary* dic in [HBAppConfig getInstance].monitorTimerArray) {
@@ -484,11 +502,9 @@
         }
         else
         {
-            NSCalendar *gregorian = [[NSCalendar alloc] initWithCalendarIdentifier:NSGregorianCalendar];
-            NSDateComponents *weekdayComponents =[gregorian components:NSWeekdayCalendarUnit fromDate:[NSDate date]];
-            NSInteger weekday = [weekdayComponents weekday];
             // weekday 1 = Sunday for Gregorian calendar
-            if (weekday > 1 && weekday < 7) {   // 周一到周五
+            // 周五，周日单独检查（周五有可能漏掉周六的定时器，周日可能漏掉周一的定时器）
+            if (weekday > 1 && weekday < 6) {   // 周一到周四
                 if (weekendFlag) {
                     [self writeMyLog:[NSString stringWithFormat:@"%@ 今天不工作", timerName]];
                 }
@@ -501,7 +517,35 @@
                     [tempArray addObject:timer];
                 }
             }
-            else    // 周末
+            else if (weekday == 6)  // 周五
+            {
+                if (weekendFlag && ![self isTomorrow:timerDate]) {
+                    [self writeMyLog:[NSString stringWithFormat:@"%@ 今天不工作", timerName]];
+                }
+                else
+                {
+                    NSUInteger timeDelay = [self getTimerDelayTime:timerDate];
+                    NSTimer* timer = [NSTimer timerWithTimeInterval:timeDelay target:self selector:@selector(timerStart) userInfo:nil repeats:NO];
+                    [self writeMyLog:[NSString stringWithFormat:@"%@ 将在%d时%d分%d秒后启动", timerName, timeDelay/(60*60), (timeDelay%(60*60))/60, timeDelay%60]];
+                    [[NSRunLoop currentRunLoop] addTimer:timer forMode:NSRunLoopCommonModes];
+                    [tempArray addObject:timer];
+                }
+            }
+            else if (weekday == 1)  // 周日
+            {
+                if (weekendFlag || [self isTomorrow:timerDate]) {
+                    NSUInteger timeDelay = [self getTimerDelayTime:timerDate];
+                    NSTimer* timer = [NSTimer timerWithTimeInterval:timeDelay target:self selector:@selector(timerStart) userInfo:nil repeats:NO];
+                    [self writeMyLog:[NSString stringWithFormat:@"%@ 将在%d时%d分%d秒后启动", timerName, timeDelay/(60*60), (timeDelay%(60*60))/60, timeDelay%60]];
+                    [[NSRunLoop currentRunLoop] addTimer:timer forMode:NSRunLoopCommonModes];
+                    [tempArray addObject:timer];
+                }
+                else
+                {
+                    [self writeMyLog:[NSString stringWithFormat:@"%@ 今天不工作", timerName]];
+                }
+            }
+            else    // 周六
             {
                 if (weekendFlag) {
                     NSUInteger timeDelay = [self getTimerDelayTime:timerDate];
@@ -518,6 +562,11 @@
         }
     }
     
+    [self performSelector:@selector(endLog) withObject:nil afterDelay:.1];
+    
+    for (NSTimer* timer in self.timerArray) {
+        [timer invalidate];
+    }
     self.timerArray = tempArray;
 }
 
@@ -531,24 +580,53 @@
     [self performSelectorOnMainThread:@selector(monitorSelectedInterface) withObject:nil waitUntilDone:NO];
 }
 
+- (BOOL)isTomorrow:(NSDate*)date
+{
+    NSDate* now = [NSDate date];
+    
+    NSCalendar* calendar = [NSCalendar currentCalendar];
+    NSDateComponents* nowComponents = [calendar components:NSHourCalendarUnit|NSMinuteCalendarUnit|NSSecondCalendarUnit fromDate:now];
+    NSDateComponents* timerComponents = [calendar components:NSHourCalendarUnit|NSMinuteCalendarUnit|NSSecondCalendarUnit fromDate:date];
+    
+    NSInteger nowHour = [nowComponents hour];
+    NSInteger nowMinute = [nowComponents minute];
+    NSInteger nowSecond = [nowComponents second];
+    NSInteger timerHour = [timerComponents hour];
+    NSInteger timerMinute = [timerComponents minute];
+    NSInteger timerSecond = [timerComponents second];
+    NSInteger hourGap = timerHour - nowHour;
+    NSInteger timeGap= (hourGap*60 + (timerMinute - nowMinute))*60 + (timerSecond - nowSecond);
+    
+    return timeGap < 0;
+}
+
 - (NSUInteger)getTimerDelayTime:(NSDate*)date
 {
     NSDate* now = [NSDate date];
     
     NSCalendar* calendar = [NSCalendar currentCalendar];
-    NSDateComponents* nowComponents = [calendar components:NSHourCalendarUnit|NSMinuteCalendarUnit fromDate:now];
-    NSDateComponents* timerComponents = [calendar components:NSHourCalendarUnit|NSMinuteCalendarUnit fromDate:date];
+    NSDateComponents* nowComponents = [calendar components:NSHourCalendarUnit|NSMinuteCalendarUnit|NSSecondCalendarUnit fromDate:now];
+    NSDateComponents* timerComponents = [calendar components:NSHourCalendarUnit|NSMinuteCalendarUnit|NSSecondCalendarUnit fromDate:date];
     
     NSInteger nowHour = [nowComponents hour];
     NSInteger nowMinute = [nowComponents minute];
+    NSInteger nowSecond = [nowComponents second];
     NSInteger timerHour = [timerComponents hour];
     NSInteger timerMinute = [timerComponents minute];
+    NSInteger timerSecond = [timerComponents second];
     NSInteger hourGap = timerHour - nowHour;
-    NSInteger timeGap= (hourGap*60 + (timerMinute - nowMinute))*60;
+    NSInteger timeGap= (hourGap*60 + (timerMinute - nowMinute))*60 + (timerSecond - nowSecond);
     
-    if (timeGap <= 0) {
+#ifdef TEST_TIMER
+    while (timeGap <= 0) {
+        timeGap = timeGap + 1*60;
+    }
+    
+#else
+    if (timeGap < 0) {
         timeGap = timeGap + 24*60*60;
     }
+#endif
     
     return timeGap;
 }
