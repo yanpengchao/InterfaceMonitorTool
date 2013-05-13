@@ -533,7 +533,7 @@
             }
             else if (weekday == 1)  // 周日
             {
-                if (weekendFlag || [self isTomorrow:timerDate]) {
+                if ((weekendFlag && ![self isTomorrow:timerDate]) || (!weekendFlag && [self isTomorrow:timerDate])) {
                     NSUInteger timeDelay = [self getTimerDelayTime:timerDate];
                     NSTimer* timer = [NSTimer timerWithTimeInterval:timeDelay target:self selector:@selector(timerStart) userInfo:nil repeats:NO];
                     [self writeMyLog:[NSString stringWithFormat:@"%@ 将在%d时%d分%d秒后启动", timerName, timeDelay/(60*60), (timeDelay%(60*60))/60, timeDelay%60]];
