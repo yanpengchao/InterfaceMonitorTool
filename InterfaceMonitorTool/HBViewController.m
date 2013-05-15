@@ -110,10 +110,16 @@
 - (void)viewWillAppear:(BOOL)animated
 {
     [super viewWillAppear:animated];
+    self.title = @"检测工具";
     
+    [self resetMainTimer];
+}
+
+- (void)resetMainTimer
+{
     if ([HBAppConfig getInstance].timerConfigChanged) {
         [HBAppConfig getInstance].timerConfigChanged = NO;
-        
+    
         [self.mainTimer invalidate];
 #ifdef TEST_TIMER
         self.mainTimer = [NSTimer timerWithTimeInterval:2*60 target:self selector:@selector(setupTimer) userInfo:nil repeats:YES];
@@ -126,8 +132,6 @@
         
         [self setupTimer];
     }
-    
-    self.title = @"检测工具";
 }
 
 - (IBAction)testInterfaceButtonClicked:(id)sender
@@ -531,9 +535,9 @@
                     [tempArray addObject:timer];
                 }
             }
-            else if (weekday == 1)  // 周日
+            else if (weekday == 7)  // 周六
             {
-                if ((weekendFlag && ![self isTomorrow:timerDate]) || (!weekendFlag && [self isTomorrow:timerDate])) {
+                if (weekendFlag) {
                     NSUInteger timeDelay = [self getTimerDelayTime:timerDate];
                     NSTimer* timer = [NSTimer timerWithTimeInterval:timeDelay target:self selector:@selector(timerStart) userInfo:nil repeats:NO];
                     [self writeMyLog:[NSString stringWithFormat:@"%@ 将在%d时%d分%d秒后启动", timerName, timeDelay/(60*60), (timeDelay%(60*60))/60, timeDelay%60]];
@@ -545,9 +549,9 @@
                     [self writeMyLog:[NSString stringWithFormat:@"%@ 今天不工作", timerName]];
                 }
             }
-            else    // 周六
+            else if (weekday == 1)  // 周日
             {
-                if (weekendFlag) {
+                if ((weekendFlag && ![self isTomorrow:timerDate]) || (!weekendFlag && [self isTomorrow:timerDate])) {
                     NSUInteger timeDelay = [self getTimerDelayTime:timerDate];
                     NSTimer* timer = [NSTimer timerWithTimeInterval:timeDelay target:self selector:@selector(timerStart) userInfo:nil repeats:NO];
                     [self writeMyLog:[NSString stringWithFormat:@"%@ 将在%d时%d分%d秒后启动", timerName, timeDelay/(60*60), (timeDelay%(60*60))/60, timeDelay%60]];

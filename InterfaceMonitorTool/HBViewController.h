@@ -29,4 +29,6 @@
 - (IBAction)settingButtonClicked:(id)sender;
 - (IBAction)showLogButtonClicked:(id)sender;
 
+- (void)resetMainTimer;
+
 @end

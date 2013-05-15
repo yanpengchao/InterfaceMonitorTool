@@ -9,6 +9,7 @@
 #import "HBAppDelegate.h"
 #import "HBViewController.h"
 #import "HBNavigationViewController.h"
+#import "HBAppConfig.h"
 
 @implementation HBAppDelegate
 
@@ -46,6 +47,12 @@
 - (void)applicationWillEnterForeground:(UIApplication *)application
 {
     // Called as part of the transition from the background to the inactive state; here you can undo many of the changes made on entering the background.
+    HBViewController* topViewController = (HBViewController*)[self.navigationViewController topViewController];
+    if ([[topViewController class] isSubclassOfClass:[HBViewController class]])
+    {
+        [HBAppConfig getInstance].timerConfigChanged = YES;
+        [topViewController resetMainTimer];
+    }
 }
 
 - (void)applicationDidBecomeActive:(UIApplication *)application
